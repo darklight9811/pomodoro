@@ -22,10 +22,10 @@ export function display_time (seconds: number, thresold = 2) {
 	if (seconds < 60 * thresold)
 		return `${seconds} second${seconds !== 1 ? "s":""}`
 
-	const minutes = seconds / 60
+	const minutes = Math.floor(seconds / 60)
 	if (minutes < 60 * thresold)
 		return `${minutes} minute${minutes !== 1 ? "s":""}`
 
-	const hours = minutes / 60
+	const hours = Math.floor(minutes / 60)
 	return `${hours} hour${hours !== 1 ? "s":""}`
 }

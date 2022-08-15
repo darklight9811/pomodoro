@@ -1,5 +1,5 @@
 // Packages
-import { useEffect, useMemo, useState } from "preact/hooks"
+import { useEffect, useMemo, useRef, useState } from "preact/hooks"
 
 // Components
 import { Box, Button, Heading } from "@app/components"
@@ -7,6 +7,8 @@ import { Box, Button, Heading } from "@app/components"
 // Services
 import stepService from "@app/store/step"
 import taskService from "@app/store/task"
+
+// Helpers
 import { display_time } from "@app/helpers/general"
 
 export default function Task () {
@@ -17,11 +19,17 @@ export default function Task () {
 	// states
 	const [timer, settimer] = useState(0)
 	const [stopcount, setstop] = useState(false)
+	const [audio] = useState(new Audio("fx/timer.wav"))
 
 	// services
 	const [config] = taskService.useModel()
 	const current = taskService.useCurrent()
 	const [steps] = stepService.useModel()
+
+	// refs
+	const reftimer = useRef<number>(0)
+	const lastupdate = useRef<number>()
+	const loop = useRef<number>()
 
 	// -------------------------------------------------
 	// Callbacks
@@ -30,8 +38,17 @@ export default function Task () {
 	function start () {
 		setstop(false)
 		settimer(0)
+		lastupdate.current = Date.now()
 		taskService.start()
 	}
+
+	function skip () {
+		setstop(false)
+		settimer(0)
+		taskService.next()
+	}
+
+	console.log(audio)
 
 	function stop () {
 		setstop(true)
@@ -44,7 +61,25 @@ export default function Task () {
 	// -------------------------------------------------
 
 	useEffect(() => {
-		if (current && !stopcount) settimer(i => i)
+		reftimer.current = timer
+	}, [timer])
+
+	useEffect(() => {
+		if (current && !stopcount) loop.current = setInterval(() => {
+			const now = Date.now()
+
+			if (Math.floor(reftimer.current / 1000) >= (current.duration * 60) - 2) {
+				audio.volume
+				audio.play()
+				skip()
+			}
+			else {
+				settimer(i => i + (now - lastupdate.current!))
+				lastupdate.current = now
+			}
+		}, 100)
+
+		return () => clearInterval(loop.current)
 	}, [current, stopcount])
 
 	// -------------------------------------------------
@@ -97,15 +132,15 @@ export default function Task () {
 				</Box>
 			</Box>
 
-			<Box my="4">
-				{current && `${display_time((current.duration - Math.ceil(timer / 60)) * 60)} remaining`}
-				<progress value={Math.ceil(timer / 60)} max={current?.duration || 100} />
+			<Box mt="4" mb="2">
+				{current && `${display_time((current.duration * 60 - Math.ceil(timer / 1000)))} remaining`}
+				<progress value={timer / 1000} max={(current?.duration || 100) * 60} />
 			</Box>
 
-			<Box direction="row" horizontal="center" gap="1" mt="4">
+			<Box direction="row" horizontal="center" gap="1">
 				<Button disabled={!current} onClick={() => taskService.clear()}>Clear</Button>
 				<Button onClick={config.running ? stop:start}>{config.running ? "stop" : "start"}</Button>
-				<Button disabled={!current} onClick={() => taskService.next()}>Skip</Button>
+				<Button disabled={!current} onClick={skip}>Skip</Button>
 			</Box>
 		</Box>
 	)
